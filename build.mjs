@@ -7,6 +7,9 @@ const common = {
   format: 'iife',
   charset: 'utf8',
   write: false,
+  /* minifier가 \n 이스케이프 문자열을 실제 개행이 든 template literal로
+     바꾸는 것을 금지 — bookmarklet URL은 한 줄이어야 한다 */
+  supported: { 'template-literal': false },
 };
 
 const readable = await build(common);
@@ -17,9 +20,11 @@ await mkdir('dist', { recursive: true });
 const readableCode = readable.outputFiles[0].text;
 await writeFile('dist/bookmarklet.js', readableCode);
 
-/* esbuild IIFE 출력 "(()=>{...})();\n" → 끝 세미콜론 제거 후 newline 제거, javascript: URL로 래핑 */
-let code = min.outputFiles[0].text.trim().replace(/;$/, '');
-code = code.replace(/\n/g, '');
+/* esbuild IIFE 출력 "(()=>{...})();\n" → 끝 세미콜론 제거 후 javascript: URL로 래핑 */
+const code = min.outputFiles[0].text.trim().replace(/;$/, '');
+if (code.includes('\n')) {
+  throw new Error('minified 출력이 한 줄이 아닙니다 — bookmarklet URL로 사용할 수 없습니다.');
+}
 const url = 'javascript:void(' + code + ')';
 await writeFile('dist/bookmarklet.min.js', url);
 
