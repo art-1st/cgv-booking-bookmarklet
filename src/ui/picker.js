@@ -5,6 +5,7 @@ import { selectAdults } from '../visitors.js';
 const CHIP = 30;   /* 좌석 칩 크기(px) */
 const GAP = 2;
 const LABEL_W = 24; /* 행 라벨 열 너비(px) */
+const DRAG_THRESHOLD = 6; /* 이 거리(px) 미만의 Shift+드래그는 Shift+클릭으로 처리 */
 
 export function showPicker(initialSeats, initialPeople){
   return new Promise(resolve => {
@@ -13,6 +14,8 @@ export function showPicker(initialSeats, initialPeople){
     let seats = initialSeats;
     let people = initialPeople || 1;
     let selected = [];
+    let anchor = null;   /* 마지막으로 클릭한 좌석 label — Shift+클릭 사각형의 기준점 */
+    let chipMap = {};    /* label -> chip 엘리먼트 (renderGrid에서 갱신) */
 
     const ov = document.createElement('div');
     ov.id = 'cgv-sniper-overlay';
@@ -26,7 +29,7 @@ export function showPicker(initialSeats, initialPeople){
     const hdr = document.createElement('div');
     Object.assign(hdr.style, { textAlign: 'center', padding: '16px 16px 4px', flexShrink: '0', width: '100%' });
     hdr.innerHTML = '<h2 style="margin:0 0 4px;font-size:17px;color:#e94560">좌석 스나이퍼</h2>'
-      + '<p style="margin:0;font-size:12px;color:#888">잡고 싶은 좌석을 우선순위 순으로 터치하세요</p>';
+      + '<p style="margin:0;font-size:12px;color:#888">잡고 싶은 좌석을 우선순위 순으로 터치 · Shift+클릭/드래그로 범위 선택</p>';
     ov.appendChild(hdr);
 
     /* 인원 토글 */
@@ -49,7 +52,7 @@ export function showPicker(initialSeats, initialPeople){
     Object.assign(status.style, {
       padding: '6px 16px', margin: '0 16px 8px', background: '#16213e',
       borderRadius: '8px', fontSize: '13px', color: '#e94560',
-      textAlign: 'center', minHeight: '18px', wordBreak: 'break-all', flexShrink: '0',
+      textAlign: 'center', minHeight: '18px', flexShrink: '0',
     });
     ov.appendChild(status);
 
@@ -92,9 +95,67 @@ export function showPicker(initialSeats, initialPeople){
     bw.appendChild(confirmBtn);
     ov.appendChild(bw);
 
+    /* ── 선택 상태 헬퍼 ── */
+    function seatByLabel(label){ return seats.find(s => s.label === label); }
+
+    /* selected 기준으로 모든 chip의 색/번호를 다시 칠한다 (범위 선택 후 일괄 갱신). */
+    function repaintChips(){
+      seats.forEach(s => {
+        const chip = chipMap[s.label];
+        if (!chip) return;
+        const idx = selected.indexOf(s.label);
+        if (idx >= 0){
+          chip.style.background = '#e94560';
+          chip.style.color = '#fff';
+          chip.textContent = '[' + (idx + 1) + ']';
+        } else {
+          chip.style.background = s.sold ? '#4a1a1a' : '#1a3a5c';
+          chip.style.color = s.sold ? '#ff6b6b' : '#7bb8e0';
+          chip.textContent = s.label;
+        }
+      });
+    }
+
+    function toggleSeat(label){
+      const idx = selected.indexOf(label);
+      if (idx >= 0) selected.splice(idx, 1);
+      else selected.push(label);
+    }
+
+    /* 두 좌석이 이루는 격자 사각형 내의 실제 좌석을 우선순위 순(행→열)으로 누적 선택.
+       같은 행이면 행 범위, 같은 열이면 열 범위, 그 외엔 직사각형. */
+    function addRectByLabels(aLabel, bLabel){
+      const a = seatByLabel(aLabel), b = seatByLabel(bLabel);
+      if (!a || !b) return;
+      addRect(a.row, a.col, b.row, b.col);
+    }
+
+    function addRect(rowA, colA, rowB, colB){
+      const r1 = Math.min(rowA, rowB), r2 = Math.max(rowA, rowB);
+      const c1 = Math.min(colA, colB), c2 = Math.max(colA, colB);
+      seats
+        .filter(s => s.row >= r1 && s.row <= r2 && s.col >= c1 && s.col <= c2)
+        .sort((x, y) => x.row - y.row || x.col - y.col)
+        .forEach(s => { if (!selected.includes(s.label)) selected.push(s.label); });
+    }
+
+    /* 화면 사각형(rect)과 겹치는 좌석을 우선순위 순으로 누적 선택 (Shift+드래그 러버밴드). */
+    function addByScreenRect(rect){
+      seats
+        .map(s => ({ s, chip: chipMap[s.label] }))
+        .filter(({ chip }) => {
+          if (!chip) return false;
+          const c = chip.getBoundingClientRect();
+          return c.left < rect.right && c.right > rect.left && c.top < rect.bottom && c.bottom > rect.top;
+        })
+        .map(({ s }) => s)
+        .sort((x, y) => x.row - y.row || x.col - y.col)
+        .forEach(s => { if (!selected.includes(s.label)) selected.push(s.label); });
+    }
+
     function updateStatus(){
       status.textContent = selected.length
-        ? selected.map((t, i) => (i + 1) + '.' + t).join('  ')
+        ? selected.length + '석 선택됨'
         : (people === 2
           ? '후보를 2개 이상 선택하세요 (빈 2석 확보 시 점유, 인접 보장 없음)'
           : '선택된 좌석 없음');
@@ -111,6 +172,7 @@ export function showPicker(initialSeats, initialPeople){
 
     function renderGrid(){
       mapWrap.textContent = '';
+      chipMap = {};
       const screen = document.createElement('div');
       Object.assign(screen.style, { textAlign: 'center', color: '#555', fontSize: '11px', marginBottom: '8px', letterSpacing: '4px' });
       screen.textContent = 'SCREEN';
@@ -150,14 +212,8 @@ export function showPicker(initialSeats, initialPeople){
         });
       });
 
-      const chipMap = {};
       seats.forEach(s => {
         const chip = document.createElement('button');
-        const paintBase = () => {
-          chip.style.background = s.sold ? '#4a1a1a' : '#1a3a5c';
-          chip.style.color = s.sold ? '#ff6b6b' : '#7bb8e0';
-          chip.textContent = s.label;
-        };
         Object.assign(chip.style, {
           gridColumn: s.col + 2, /* +2: 라벨열 1칸 오프셋 */
           gridRow: s.row + 1,
@@ -166,34 +222,66 @@ export function showPicker(initialSeats, initialPeople){
           padding: '0', lineHeight: CHIP + 'px', textAlign: 'center',
           transition: 'background 0.1s',
         });
-        paintBase();
-        chip.addEventListener('click', () => {
-          const idx = selected.indexOf(s.label);
-          if (idx >= 0){
-            selected.splice(idx, 1);
-            paintBase();
-            selected.forEach((t, i) => {
-              const c = chipMap[t];
-              if (c) c.textContent = '[' + (i + 1) + ']';
-            });
+        chip.addEventListener('click', e => {
+          if (e.shiftKey && anchor && anchor !== s.label){
+            addRectByLabels(anchor, s.label); /* Shift+클릭: anchor→현재 사각형 */
           } else {
-            selected.push(s.label);
-            chip.style.background = '#e94560';
-            chip.style.color = '#fff';
-            chip.textContent = '[' + selected.length + ']';
+            toggleSeat(s.label);
           }
+          anchor = s.label;
+          repaintChips();
           updateStatus();
         });
         chipMap[s.label] = chip;
         grid.appendChild(chip);
       });
+
+      /* Shift+드래그 러버밴드 선택 (데스크톱). 일반 드래그는 스크롤로 남겨둔다. */
+      grid.addEventListener('mousedown', e => {
+        if (!e.shiftKey) return;
+        e.preventDefault(); /* 텍스트 선택/스크롤 방지 */
+        const x0 = e.clientX, y0 = e.clientY;
+        const boxEl = document.createElement('div');
+        Object.assign(boxEl.style, {
+          position: 'fixed', border: '1px solid #e94560',
+          background: 'rgba(233,69,96,0.2)', zIndex: 1000000, pointerEvents: 'none',
+          left: x0 + 'px', top: y0 + 'px', width: '0px', height: '0px',
+        });
+        document.body.appendChild(boxEl);
+        let moved = 0;
+        const onMove = ev => {
+          const x1 = ev.clientX, y1 = ev.clientY;
+          moved = Math.max(moved, Math.abs(x1 - x0) + Math.abs(y1 - y0));
+          Object.assign(boxEl.style, {
+            left: Math.min(x0, x1) + 'px', top: Math.min(y0, y1) + 'px',
+            width: Math.abs(x1 - x0) + 'px', height: Math.abs(y1 - y0) + 'px',
+          });
+        };
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          const rect = boxEl.getBoundingClientRect();
+          boxEl.remove();
+          if (moved >= DRAG_THRESHOLD){ /* 실제 드래그일 때만 러버밴드 적용 */
+            addByScreenRect(rect);
+            repaintChips();
+            updateStatus();
+          }
+          /* 이동이 거의 없으면 chip의 click(Shift+클릭)이 처리하도록 둔다 */
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+
       mapWrap.appendChild(grid);
+      repaintChips();
     }
 
     async function setPeople(n){
       if (n === people){ updateStatus(); return; }
       people = n;
       selected = [];
+      anchor = null;
       status.textContent = '인원 변경 중...';
       let err = null;
       try {

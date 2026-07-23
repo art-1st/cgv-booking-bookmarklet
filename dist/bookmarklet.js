@@ -100,12 +100,15 @@
   var CHIP = 30;
   var GAP = 2;
   var LABEL_W = 24;
+  var DRAG_THRESHOLD = 6;
   function showPicker(initialSeats, initialPeople) {
     return new Promise((resolve) => {
       document.getElementById("cgv-sniper-overlay")?.remove();
       let seats = initialSeats;
       let people = initialPeople || 1;
       let selected = [];
+      let anchor = null;
+      let chipMap = {};
       const ov = document.createElement("div");
       ov.id = "cgv-sniper-overlay";
       Object.assign(ov.style, {
@@ -125,7 +128,7 @@
       });
       const hdr = document.createElement("div");
       Object.assign(hdr.style, { textAlign: "center", padding: "16px 16px 4px", flexShrink: "0", width: "100%" });
-      hdr.innerHTML = '<h2 style="margin:0 0 4px;font-size:17px;color:#e94560">좌석 스나이퍼</h2><p style="margin:0;font-size:12px;color:#888">잡고 싶은 좌석을 우선순위 순으로 터치하세요</p>';
+      hdr.innerHTML = '<h2 style="margin:0 0 4px;font-size:17px;color:#e94560">좌석 스나이퍼</h2><p style="margin:0;font-size:12px;color:#888">잡고 싶은 좌석을 우선순위 순으로 터치 · Shift+클릭/드래그로 범위 선택</p>';
       ov.appendChild(hdr);
       const peopleWrap = document.createElement("div");
       Object.assign(peopleWrap.style, { display: "flex", gap: "8px", justifyContent: "center", padding: "4px 0 8px", flexShrink: "0" });
@@ -156,7 +159,6 @@
         color: "#e94560",
         textAlign: "center",
         minHeight: "18px",
-        wordBreak: "break-all",
         flexShrink: "0"
       });
       ov.appendChild(status);
@@ -212,8 +214,53 @@
       bw.appendChild(cancelBtn);
       bw.appendChild(confirmBtn);
       ov.appendChild(bw);
+      function seatByLabel(label) {
+        return seats.find((s) => s.label === label);
+      }
+      function repaintChips() {
+        seats.forEach((s) => {
+          const chip = chipMap[s.label];
+          if (!chip) return;
+          const idx = selected.indexOf(s.label);
+          if (idx >= 0) {
+            chip.style.background = "#e94560";
+            chip.style.color = "#fff";
+            chip.textContent = "[" + (idx + 1) + "]";
+          } else {
+            chip.style.background = s.sold ? "#4a1a1a" : "#1a3a5c";
+            chip.style.color = s.sold ? "#ff6b6b" : "#7bb8e0";
+            chip.textContent = s.label;
+          }
+        });
+      }
+      function toggleSeat(label) {
+        const idx = selected.indexOf(label);
+        if (idx >= 0) selected.splice(idx, 1);
+        else selected.push(label);
+      }
+      function addRectByLabels(aLabel, bLabel) {
+        const a = seatByLabel(aLabel), b = seatByLabel(bLabel);
+        if (!a || !b) return;
+        addRect(a.row, a.col, b.row, b.col);
+      }
+      function addRect(rowA, colA, rowB, colB) {
+        const r1 = Math.min(rowA, rowB), r2 = Math.max(rowA, rowB);
+        const c1 = Math.min(colA, colB), c2 = Math.max(colA, colB);
+        seats.filter((s) => s.row >= r1 && s.row <= r2 && s.col >= c1 && s.col <= c2).sort((x, y) => x.row - y.row || x.col - y.col).forEach((s) => {
+          if (!selected.includes(s.label)) selected.push(s.label);
+        });
+      }
+      function addByScreenRect(rect) {
+        seats.map((s) => ({ s, chip: chipMap[s.label] })).filter(({ chip }) => {
+          if (!chip) return false;
+          const c = chip.getBoundingClientRect();
+          return c.left < rect.right && c.right > rect.left && c.top < rect.bottom && c.bottom > rect.top;
+        }).map(({ s }) => s).sort((x, y) => x.row - y.row || x.col - y.col).forEach((s) => {
+          if (!selected.includes(s.label)) selected.push(s.label);
+        });
+      }
       function updateStatus() {
-        status.textContent = selected.length ? selected.map((t, i) => i + 1 + "." + t).join("  ") : people === 2 ? "후보를 2개 이상 선택하세요 (빈 2석 확보 시 점유, 인접 보장 없음)" : "선택된 좌석 없음";
+        status.textContent = selected.length ? selected.length + "석 선택됨" : people === 2 ? "후보를 2개 이상 선택하세요 (빈 2석 확보 시 점유, 인접 보장 없음)" : "선택된 좌석 없음";
         const ok = selected.length >= people;
         confirmBtn.disabled = !ok;
         confirmBtn.style.opacity = ok ? "1" : "0.4";
@@ -226,6 +273,7 @@
       }
       function renderGrid() {
         mapWrap.textContent = "";
+        chipMap = {};
         const screen = document.createElement("div");
         Object.assign(screen.style, { textAlign: "center", color: "#555", fontSize: "11px", marginBottom: "8px", letterSpacing: "4px" });
         screen.textContent = "SCREEN";
@@ -269,14 +317,8 @@
             grid.appendChild(lbl);
           });
         });
-        const chipMap = {};
         seats.forEach((s) => {
           const chip = document.createElement("button");
-          const paintBase = () => {
-            chip.style.background = s.sold ? "#4a1a1a" : "#1a3a5c";
-            chip.style.color = s.sold ? "#ff6b6b" : "#7bb8e0";
-            chip.textContent = s.label;
-          };
           Object.assign(chip.style, {
             gridColumn: s.col + 2,
             /* +2: 라벨열 1칸 오프셋 */
@@ -292,28 +334,63 @@
             textAlign: "center",
             transition: "background 0.1s"
           });
-          paintBase();
-          chip.addEventListener("click", () => {
-            const idx = selected.indexOf(s.label);
-            if (idx >= 0) {
-              selected.splice(idx, 1);
-              paintBase();
-              selected.forEach((t, i) => {
-                const c = chipMap[t];
-                if (c) c.textContent = "[" + (i + 1) + "]";
-              });
+          chip.addEventListener("click", (e) => {
+            if (e.shiftKey && anchor && anchor !== s.label) {
+              addRectByLabels(anchor, s.label);
             } else {
-              selected.push(s.label);
-              chip.style.background = "#e94560";
-              chip.style.color = "#fff";
-              chip.textContent = "[" + selected.length + "]";
+              toggleSeat(s.label);
             }
+            anchor = s.label;
+            repaintChips();
             updateStatus();
           });
           chipMap[s.label] = chip;
           grid.appendChild(chip);
         });
+        grid.addEventListener("mousedown", (e) => {
+          if (!e.shiftKey) return;
+          e.preventDefault();
+          const x0 = e.clientX, y0 = e.clientY;
+          const boxEl = document.createElement("div");
+          Object.assign(boxEl.style, {
+            position: "fixed",
+            border: "1px solid #e94560",
+            background: "rgba(233,69,96,0.2)",
+            zIndex: 1e6,
+            pointerEvents: "none",
+            left: x0 + "px",
+            top: y0 + "px",
+            width: "0px",
+            height: "0px"
+          });
+          document.body.appendChild(boxEl);
+          let moved = 0;
+          const onMove = (ev) => {
+            const x1 = ev.clientX, y1 = ev.clientY;
+            moved = Math.max(moved, Math.abs(x1 - x0) + Math.abs(y1 - y0));
+            Object.assign(boxEl.style, {
+              left: Math.min(x0, x1) + "px",
+              top: Math.min(y0, y1) + "px",
+              width: Math.abs(x1 - x0) + "px",
+              height: Math.abs(y1 - y0) + "px"
+            });
+          };
+          const onUp = () => {
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+            const rect = boxEl.getBoundingClientRect();
+            boxEl.remove();
+            if (moved >= DRAG_THRESHOLD) {
+              addByScreenRect(rect);
+              repaintChips();
+              updateStatus();
+            }
+          };
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        });
         mapWrap.appendChild(grid);
+        repaintChips();
       }
       async function setPeople(n) {
         if (n === people) {
@@ -322,6 +399,7 @@
         }
         people = n;
         selected = [];
+        anchor = null;
         status.textContent = "인원 변경 중...";
         let err = null;
         try {
