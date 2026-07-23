@@ -16,8 +16,8 @@ CGV 영화 예매 시 이미 매진된 인기 좌석의 **취소표를 자동으
 ### 1. 빌드
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm build
 ```
 
 ### 2. Bookmarklet 등록
@@ -57,8 +57,8 @@ npm run build
 ## 개발
 
 ```bash
-npm run build   # dist/ 산출물 생성
-npm run watch   # src/ 변경 감지 자동 재빌드
+pnpm build   # dist/ 산출물 생성
+pnpm watch   # src/ 변경 감지 자동 재빌드
 ```
 
 - `src/` — 기능별 ESM 모듈 (진입점 `src/index.js`)

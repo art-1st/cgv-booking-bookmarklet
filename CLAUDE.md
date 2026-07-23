@@ -11,8 +11,9 @@ CGV 좌석선택 페이지(`cgv.co.kr/cnm/selectVisitorCnt`)에서 매진 좌석
 ## 빌드
 
 ```bash
-npm run build   # src/ → dist/bookmarklet.js(readable) + dist/bookmarklet.min.js(javascript: URL)
-npm run watch   # src/ 변경 감지 재빌드
+pnpm install    # 최초 1회 (pnpm 사용, esbuild는 onlyBuiltDependencies로 승인됨)
+pnpm build      # src/ → dist/bookmarklet.js(readable) + dist/bookmarklet.min.js(javascript: URL)
+pnpm watch      # src/ 변경 감지 재빌드
 ```
 
 테스트 프레임워크 없음. 순수 로직은 `node -e`로 검증(모든 모듈은 import 부수효과가 없어 Node에서 import 가능), DOM 로직은 실페이지에서 `dist/bookmarklet.js`를 콘솔/agent-browser로 주입해 스모크 테스트.
