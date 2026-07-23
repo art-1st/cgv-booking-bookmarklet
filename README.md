@@ -13,18 +13,25 @@ CGV 영화 예매 시 이미 매진된 인기 좌석의 **취소표를 자동으
 
 ## 설치
 
-### 1. 빌드
+### 방법 1: 설치 페이지에서 드래그 (권장)
+
+👉 **[설치 페이지 열기](https://art-1st.github.io/cgv-booking-bookmarklet/)**
+
+페이지의 **[🎬 CGV 좌석 스나이퍼]** 버튼을 브라우저 **북마크바로 드래그**하면 끝입니다.
+
+> **모바일**: 드래그가 안 되므로, 임의 페이지를 북마크한 뒤 편집에서 URL을 설치 페이지 버튼의 링크 주소로 교체하세요.
+
+### 방법 2: 직접 빌드
+
+소스를 직접 빌드해 등록할 수도 있습니다.
 
 ```bash
 pnpm install
 pnpm build
 ```
 
-### 2. Bookmarklet 등록
-
-`dist/bookmarklet.min.js` 파일 내용 **전체**를 복사해 북마크 URL로 등록합니다. (`javascript:` 접두어가 이미 포함된 완성된 URL입니다.)
-
-> **모바일**: 임의 페이지를 북마크 → 편집에서 URL을 교체
+- `dist/bookmarklet.min.js` 내용 **전체**를 복사해 북마크 URL로 등록합니다 (`javascript:` 접두어가 포함된 완성된 URL).
+- 동일한 설치 페이지가 `docs/index.html`로도 생성되므로, 로컬에서 열어 드래그해도 됩니다.
 
 ## 사용 방법
 
@@ -64,7 +71,10 @@ pnpm watch   # src/ 변경 감지 자동 재빌드
 - `src/` — 기능별 ESM 모듈 (진입점 `src/index.js`)
 - `dist/bookmarklet.js` — readable 번들 (콘솔 디버깅용)
 - `dist/bookmarklet.min.js` — 북마크 등록용 완성 URL
+- `docs/index.html` — 드래그 설치 페이지 (빌드가 자동 생성, GitHub Pages로 배포)
 - 설계 문서: `docs/superpowers/specs/`
+
+빌드는 `dist/`와 함께 `docs/index.html`(설치 페이지)을 갱신하므로, 소스 변경 후 `pnpm build`를 실행하면 설치 페이지의 북마클릿도 자동으로 최신화됩니다.
 
 ## 주의 사항
 
