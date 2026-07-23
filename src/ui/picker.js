@@ -195,15 +195,17 @@ export function showPicker(initialSeats, initialPeople){
       people = n;
       selected = [];
       status.textContent = '인원 변경 중...';
+      let err = null;
       try {
         await selectAdults(n);       /* 전체화면 뒤에서도 클릭 가능 (v1 검증) */
         await sleep(800);            /* 좌석맵 disabled 재계산 대기 */
         seats = collectSeats();
       } catch (e) {
-        status.textContent = '인원 변경 실패: ' + e.message;
+        err = e;
       }
       renderGrid();
       updateStatus();
+      if (err) status.textContent = '인원 변경 실패: ' + err.message;
     }
 
     renderGrid();
