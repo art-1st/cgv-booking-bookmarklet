@@ -1,0 +1,13 @@
+{
+  "name": "cgv-booking-bookmarklet",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node --watch-path=./src --watch-path=./build.mjs build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
