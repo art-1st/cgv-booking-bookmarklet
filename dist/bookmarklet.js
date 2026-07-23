@@ -369,7 +369,7 @@
   async function tryClaim(picks, people, candidates = picks) {
     const selectionOk = () => {
       const labels = activeSeats().map(seatLabel);
-      return labels.length === people && labels.every((l) => candidates.includes(l));
+      return labels.length === people && labels.some((l) => candidates.includes(l));
     };
     try {
       await selectAdults(people);

@@ -36,9 +36,12 @@ export async function adjustSelection(targets){
    candidates: 전체 후보 — 자동 쌍 결과가 후보 내 조합이면 그대로 인정.
    성공 시 실제 점유한 좌석 라벨 배열, 실패 시 null (선택 상태 클린업 보장). */
 export async function tryClaim(picks, people, candidates = picks){
+  /* 확보된 people석 중 최소 1석이 후보면 인정 — CGV 2인 모드는 좌석 클릭 시
+     빈 인접석을 자동으로 함께 선택하므로(실측), 딸려온 인접석이 후보 밖이어도
+     받아들인다. length === people 조건으로 정확히 인원수만큼만 확보됐음을 보장. */
   const selectionOk = () => {
     const labels = activeSeats().map(seatLabel);
-    return labels.length === people && labels.every(l => candidates.includes(l));
+    return labels.length === people && labels.some(l => candidates.includes(l));
   };
   try {
     await selectAdults(people);
