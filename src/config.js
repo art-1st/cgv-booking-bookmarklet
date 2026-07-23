@@ -9,5 +9,10 @@ export function loadConfig(storage = globalThis.localStorage){
 }
 
 export function saveConfig(cfg, storage = globalThis.localStorage){
-  storage.setItem(KEY, JSON.stringify(cfg || {}));
+  try {
+    storage.setItem(KEY, JSON.stringify(cfg || {}));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }

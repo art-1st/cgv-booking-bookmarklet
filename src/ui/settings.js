@@ -74,8 +74,9 @@ export function showSettings(){
       : (r.ok ? '전송 성공! Telegram을 확인하세요.' : '전송 실패: ' + (r.error || 'API 오류'));
   });
   saveBtn.addEventListener('click', () => {
-    saveConfig(current());
-    result.textContent = '저장되었습니다.';
+    result.textContent = saveConfig(current())
+      ? '저장되었습니다.'
+      : '저장 실패 (브라우저 저장소 접근 불가)';
   });
   closeBtn.addEventListener('click', () => wrap.remove());
 

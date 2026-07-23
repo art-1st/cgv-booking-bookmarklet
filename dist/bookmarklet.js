@@ -423,7 +423,12 @@
     }
   }
   function saveConfig(cfg, storage = globalThis.localStorage) {
-    storage.setItem(KEY, JSON.stringify(cfg || {}));
+    try {
+      storage.setItem(KEY, JSON.stringify(cfg || {}));
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // src/notify.js
@@ -662,8 +667,7 @@
       result.textContent = r.skipped ? "token/chat_id를 입력하세요." : r.ok ? "전송 성공! Telegram을 확인하세요." : "전송 실패: " + (r.error || "API 오류");
     });
     saveBtn.addEventListener("click", () => {
-      saveConfig(current());
-      result.textContent = "저장되었습니다.";
+      result.textContent = saveConfig(current()) ? "저장되었습니다." : "저장 실패 (브라우저 저장소 접근 불가)";
     });
     closeBtn.addEventListener("click", () => wrap.remove());
     row.appendChild(testBtn);
@@ -703,6 +707,7 @@
       }
       refresh.click();
       await sleep(1500);
+      if (!running) break;
       try {
         await selectAdults(people);
       } catch (e) {
@@ -711,6 +716,8 @@
         break;
       }
       await sleep(500);
+      if (!running) break;
+      if (!running) break;
       const avail = enabledCandidates(targets);
       if (avail.length >= people) {
         const picks = avail.slice(0, people);

@@ -31,6 +31,7 @@ export async function startMonitoring(targets, people){
     if (!refresh){ stop(); await notifyAbort('새로고침 버튼을 찾을 수 없습니다.'); break; }
     refresh.click();
     await sleep(1500);
+    if (!running) break;
 
     /* 2. 인원 재선택 — 사이트가 인원수 기준으로 disabled를 재계산하게 함 */
     try {
@@ -39,8 +40,10 @@ export async function startMonitoring(targets, people){
       stop(); await notifyAbort(e.message); break;
     }
     await sleep(500);
+    if (!running) break;
 
     /* 3. 후보 중 enabled 좌석 확인 */
+    if (!running) break;
     const avail = enabledCandidates(targets);
     if (avail.length >= people){
       const picks = avail.slice(0, people);
